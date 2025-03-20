@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.pocketsoccer"
-        minSdk = 24
+        minSdk = 25
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -45,6 +45,8 @@ android {
 }
 
 dependencies {
+    implementation("androidx.compose.foundation:foundation")
+
     // Usamos el BOM de Compose para alinear versiones
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.foundation)
@@ -61,6 +63,11 @@ dependencies {
     // Otras dependencias
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+
+    // Otras librerías
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.activity.compose)
 
     // Dependencias para pruebas
     testImplementation(libs.junit)
