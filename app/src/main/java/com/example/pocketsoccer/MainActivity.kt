@@ -109,8 +109,9 @@ fun PocketSoccerGame() {
     val velocityX = remember { mutableStateOf(0f) }
     val velocityY = remember { mutableStateOf(0f) }
 
-    // --- Estado para el puntaje ---
-    val score = remember { mutableStateOf(0) }
+    // --- Estados para los puntajes de las porterías superior e inferior ---
+    val scoreTop = remember { mutableStateOf(0) }
+    val scoreBottom = remember { mutableStateOf(0) }
 
     // --- Parámetros de física ---
     val friction = 0.98f
@@ -118,15 +119,14 @@ fun PocketSoccerGame() {
     val maxSpeed = 25f
     val ballRadius = 20f
 
-    // --- Tamaño real del contenedor ---
+    // --- Tamaño real del contenedor (campo) ---
     var fieldSize by remember { mutableStateOf(IntSize.Zero) }
 
-    // --- Calculamos el margen en PX (16.dp) en el contexto composable ---
+    // --- Margen en píxeles (para que la pelota no toque el borde exacto) ---
     val marginPx = with(LocalDensity.current) { 16.dp.toPx() }
 
-    // --- UI principal ---
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1) Contenedor que ocupa toda la pantalla
+        // 1) Contenedor que ocupa toda la pantalla y mide su tamaño
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -142,7 +142,7 @@ fun PocketSoccerGame() {
                 contentScale = ContentScale.Crop
             )
 
-            // 3) Canvas para dibujar la pelota en el mismo contenedor
+            // 3) Canvas para dibujar la pelota
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
                     color = Color.Red,
@@ -152,15 +152,16 @@ fun PocketSoccerGame() {
             }
         }
 
-        // 4) Texto de goles en la parte superior
-        Text(
-            text = "Goles: ${score.value}",
-            fontSize = 24.sp,
-            color = Color.Black,
+        // 4) Texto de goles (mostrar puntaje de la portería superior e inferior)
+        Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 16.dp)
-        )
+        ) {
+            Text(text = "Portería Superior: ${scoreTop.value}", fontSize = 24.sp, color = Color.Black)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "Portería Inferior: ${scoreBottom.value}", fontSize = 24.sp, color = Color.Black)
+        }
 
         // 5) Bucle de actualización de la pelota (~60 fps)
         LaunchedEffect(Unit) {
@@ -185,47 +186,58 @@ fun PocketSoccerGame() {
                 ballX.value += velocityX.value
                 ballY.value += velocityY.value
 
-                // 5.5) Colisiones con márgenes
+                // 5.5) Colisiones con márgenes en los laterales (rebote)
                 val fieldWidthPx = fieldSize.width.toFloat()
                 val fieldHeightPx = fieldSize.height.toFloat()
 
-                // Límite izquierdo
                 if (ballX.value - ballRadius < marginPx) {
                     ballX.value = marginPx + ballRadius
                     velocityX.value = -velocityX.value
                 }
-                // Límite derecho
                 if (ballX.value + ballRadius > fieldWidthPx - marginPx) {
                     ballX.value = fieldWidthPx - marginPx - ballRadius
                     velocityX.value = -velocityX.value
                 }
-                // Límite superior
-                if (ballY.value - ballRadius < marginPx) {
-                    ballY.value = marginPx + ballRadius
-                    velocityY.value = -velocityY.value
-                }
-                // Límite inferior
-                if (ballY.value + ballRadius > fieldHeightPx - marginPx) {
-                    ballY.value = fieldHeightPx - marginPx - ballRadius
-                    velocityY.value = -velocityY.value
-                }
 
-                // 5.6) Ejemplo de gol en la parte superior (ajusta a tu gusto)
-                if (ballY.value - ballRadius <= marginPx + 50f) {
-                    // Gol si X está entre 200 y 600 (ajusta según tu imagen)
-                    if (ballX.value in (200f + marginPx)..(600f - marginPx)) {
-                        score.value++
-                        // Reiniciar la pelota al centro
+                // 5.6) Colisiones en la parte superior e inferior, con posibilidad de gol
+                // Definimos un rango horizontal para la portería (centrado en la pantalla)
+                val goalMinX = (fieldWidthPx / 2) - 100f
+                val goalMaxX = (fieldWidthPx / 2) + 100f
+
+                // Superior: Si la pelota cruza el borde superior
+                if (ballY.value - ballRadius < marginPx) {
+                    if (ballX.value in goalMinX..goalMaxX) {
+                        // Gol en la portería superior
+                        scoreTop.value++
                         ballX.value = fieldWidthPx / 2
                         ballY.value = fieldHeightPx / 2
                         velocityX.value = 0f
                         velocityY.value = 0f
+                    } else {
+                        // Rebote si no está en la zona de gol
+                        ballY.value = marginPx + ballRadius
+                        velocityY.value = -velocityY.value
+                    }
+                }
+                // Inferior: Si la pelota cruza el borde inferior
+                if (ballY.value + ballRadius > fieldHeightPx - marginPx) {
+                    if (ballX.value in goalMinX..goalMaxX) {
+                        // Gol en la portería inferior
+                        scoreBottom.value++
+                        ballX.value = fieldWidthPx / 2
+                        ballY.value = fieldHeightPx / 2
+                        velocityX.value = 0f
+                        velocityY.value = 0f
+                    } else {
+                        // Rebote si no está en la zona de gol
+                        ballY.value = fieldHeightPx - marginPx - ballRadius
+                        velocityY.value = -velocityY.value
                     }
                 }
 
-                // 5.7) Esperar ~16 ms
                 delay(16)
             }
         }
     }
 }
+
