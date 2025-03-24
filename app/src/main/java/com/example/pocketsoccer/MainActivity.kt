@@ -3,12 +3,15 @@ package com.example.pocketsoccer
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import kotlinx.coroutines.delay
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
@@ -68,7 +71,7 @@ class MainActivity : ComponentActivity() {
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun PocketSoccerGame() {
-    // SensorManager y acelerómetro
+    // --- SensorManager y acelerómetro ---
     val context = LocalContext.current
     val sensorManager = remember {
         context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -77,7 +80,7 @@ fun PocketSoccerGame() {
         sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     }
 
-    // Estados para aceleración en X e Y
+    // Estados para aceleración
     val xAcceleration = remember { mutableStateOf(0f) }
     val yAcceleration = remember { mutableStateOf(0f) }
 
@@ -100,26 +103,30 @@ fun PocketSoccerGame() {
         }
     }
 
-    // Estados para la pelota
+    // --- Estados para la pelota ---
     val ballX = remember { mutableStateOf(0f) }
     val ballY = remember { mutableStateOf(0f) }
     val velocityX = remember { mutableStateOf(0f) }
     val velocityY = remember { mutableStateOf(0f) }
 
-    // Estado para el puntaje
+    // --- Estado para el puntaje ---
     val score = remember { mutableStateOf(0) }
 
-    // Variables de física simples
+    // --- Parámetros de física ---
     val friction = 0.98f
     val speedFactor = 0.3f
     val maxSpeed = 25f
     val ballRadius = 20f
 
-    // Tamaño real del contenedor donde está la cancha
+    // --- Tamaño real del contenedor ---
     var fieldSize by remember { mutableStateOf(IntSize.Zero) }
 
+    // --- Calculamos el margen en PX (16.dp) en el contexto composable ---
+    val marginPx = with(LocalDensity.current) { 16.dp.toPx() }
+
+    // --- UI principal ---
     Box(modifier = Modifier.fillMaxSize()) {
-        // Contenedor que ocupa toda la pantalla
+        // 1) Contenedor que ocupa toda la pantalla
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -127,15 +134,15 @@ fun PocketSoccerGame() {
                     fieldSize = coords.size
                 }
         ) {
-            // Imagen de fondo a pantalla completa
+            // 2) Imagen de fondo a pantalla completa
             Image(
                 painter = painterResource(id = R.drawable.cancha),
                 contentDescription = "Fondo de cancha",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop // Llena la pantalla, recortando si es necesario
+                contentScale = ContentScale.Crop
             )
 
-            // Canvas para dibujar la pelota en el mismo contenedor
+            // 3) Canvas para dibujar la pelota en el mismo contenedor
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
                     color = Color.Red,
@@ -145,7 +152,7 @@ fun PocketSoccerGame() {
             }
         }
 
-        // Texto de goles en la parte superior
+        // 4) Texto de goles en la parte superior
         Text(
             text = "Goles: ${score.value}",
             fontSize = 24.sp,
@@ -155,52 +162,14 @@ fun PocketSoccerGame() {
                 .padding(top = 16.dp)
         )
 
-        // Actualizar la posición de la pelota y colisiones
-        SideEffect {
-            val fieldWidthPx = fieldSize.width.toFloat()
-            val fieldHeightPx = fieldSize.height.toFloat()
-
-            // Límite izquierdo
-            if (ballX.value - ballRadius < 0) {
-                ballX.value = ballRadius
-                velocityX.value = -velocityX.value
-            }
-            // Límite derecho
-            if (ballX.value + ballRadius > fieldWidthPx) {
-                ballX.value = fieldWidthPx - ballRadius
-                velocityX.value = -velocityX.value
-            }
-            // Límite superior
-            if (ballY.value - ballRadius < 0) {
-                ballY.value = ballRadius
-                velocityY.value = -velocityY.value
-            }
-            // Límite inferior
-            if (ballY.value + ballRadius > fieldHeightPx) {
-                ballY.value = fieldHeightPx - ballRadius
-                velocityY.value = -velocityY.value
-            }
-
-            // Ejemplo de gol en la parte superior
-            if (ballY.value - ballRadius <= 50f) {
-                if (ballX.value in 200f..600f) {
-                    score.value++
-                    ballX.value = fieldWidthPx / 2
-                    ballY.value = fieldHeightPx / 2
-                    velocityX.value = 0f
-                    velocityY.value = 0f
-                }
-            }
-        }
-
-        // Bucle de actualización de la pelota (~60 fps)
+        // 5) Bucle de actualización de la pelota (~60 fps)
         LaunchedEffect(Unit) {
             while (true) {
-                // Ajustar velocidad según la inclinación
+                // 5.1) Ajustar velocidad según el acelerómetro
                 velocityX.value += -xAcceleration.value * speedFactor
                 velocityY.value += yAcceleration.value * speedFactor
 
-                // Limitar velocidad máxima
+                // 5.2) Limitar velocidad máxima
                 if (abs(velocityX.value) > maxSpeed) {
                     velocityX.value = maxSpeed * (velocityX.value / abs(velocityX.value))
                 }
@@ -208,14 +177,53 @@ fun PocketSoccerGame() {
                     velocityY.value = maxSpeed * (velocityY.value / abs(velocityY.value))
                 }
 
-                // Aplicar fricción
+                // 5.3) Aplicar fricción
                 velocityX.value *= friction
                 velocityY.value *= friction
 
-                // Actualizar posición
+                // 5.4) Actualizar posición
                 ballX.value += velocityX.value
                 ballY.value += velocityY.value
 
+                // 5.5) Colisiones con márgenes
+                val fieldWidthPx = fieldSize.width.toFloat()
+                val fieldHeightPx = fieldSize.height.toFloat()
+
+                // Límite izquierdo
+                if (ballX.value - ballRadius < marginPx) {
+                    ballX.value = marginPx + ballRadius
+                    velocityX.value = -velocityX.value
+                }
+                // Límite derecho
+                if (ballX.value + ballRadius > fieldWidthPx - marginPx) {
+                    ballX.value = fieldWidthPx - marginPx - ballRadius
+                    velocityX.value = -velocityX.value
+                }
+                // Límite superior
+                if (ballY.value - ballRadius < marginPx) {
+                    ballY.value = marginPx + ballRadius
+                    velocityY.value = -velocityY.value
+                }
+                // Límite inferior
+                if (ballY.value + ballRadius > fieldHeightPx - marginPx) {
+                    ballY.value = fieldHeightPx - marginPx - ballRadius
+                    velocityY.value = -velocityY.value
+                }
+
+                // 5.6) Ejemplo de gol en la parte superior (ajusta a tu gusto)
+                if (ballY.value - ballRadius <= marginPx + 50f) {
+                    // Gol si X está entre 200 y 600 (ajusta según tu imagen)
+                    if (ballX.value in (200f + marginPx)..(600f - marginPx)) {
+                        score.value++
+                        // Reiniciar la pelota al centro
+                        ballX.value = fieldWidthPx / 2
+                        ballY.value = fieldHeightPx / 2
+                        velocityX.value = 0f
+                        velocityY.value = 0f
+                    }
+                }
+
+                // 5.7) Esperar ~16 ms
                 delay(16)
             }
         }
